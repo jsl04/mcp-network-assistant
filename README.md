@@ -86,6 +86,10 @@ Click the 🛠 hammer icon in Claude. You should see:
 - `get_network_standards()`
 - `get_device_status(device_name)`
 
+![Claude](assets/claude-af.gif)
+
+
+
 Now ask Claude:
 
     - What routing protocols do we use in our network?
