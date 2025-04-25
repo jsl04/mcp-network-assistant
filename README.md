@@ -1,7 +1,7 @@
 # Network Assistant — MCP Server for Network Engineers
 
 This project sets up a [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server designed specifically for **network engineers**.  
-It allows Claude for Desktop (or other LLM clients) to access structured knowledge about your network — such as routing policies and device health — via simple tools.
+It allows Claude for Desktop (or other LLM clients) to access structured knowledge about your network — such as routing policies and device health — via the `tools` primitive.
 
 
 
