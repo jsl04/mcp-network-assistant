@@ -42,7 +42,7 @@ MacOS/Linux:
 
 ## ▶️ Run Your Server
 
-    python network_assistant.py
+    python network-assistant.py
 
 This launches your MCP server over `stdio`, ready to connect to Claude.
 
