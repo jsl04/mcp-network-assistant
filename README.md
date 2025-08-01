@@ -1,107 +1,96 @@
-# Network Assistant — MCP Server for Network Engineers
+# Cisco Network Assistant MCP Tools Reference
 
-This project sets up a [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server designed specifically for **network engineers**.  
-It allows Claude for Desktop (or other LLM clients) to access structured knowledge about your network — such as routing policies and device health — via the `tools` primitive.
+*Generated 2025-08-01 00:01 UTC*
 
+This document describes the JSON-over-HTTP tools exposed by the **Cisco Network Assistant MCP server** so that retrieval‑augmented generation (RAG) systems such as Claude Desktop or LM Studio can call them reliably.
 
+---
 
-## 🧠 Prerequisite Knowledge
+## 1  Base URL
 
-This quickstart assumes you're familiar with:
-- Python
-- LLMs like Claude
+| Environment | Example URL |
+|-------------|-------------|
+| Direct FastMCP (lab) | `http://serverip:8000/mcp` |
+| Via nginx proxy (port 4242) | `http://serverip:4242/mcp` |
 
+All tools are simple **HTTP GET** (or **POST JSON** when arguments are required) beneath that prefix.
 
-## 💻 System Requirements
+---
 
-- Python **3.10 or higher**
-- MCP Python SDK **v1.2.0 or newer**
+## 2  Tool Catalogue
 
+| Tool name | Method | Arguments (JSON) | Returns |
+|-----------|--------|------------------|---------|
+| `inventory` | `GET /inventory` | _none_ | `[{hostname, ip, family, platform, sw_version, serial}]` |
+| `client_health` | `GET /client_health` | _none_ | On success: list with `score, category, total, healthy, unhealthy, time`; if empty: `{{"message":"No client‑health samples in the last 5 minutes."}}` |
+| `compliance_summary` | `GET /compliance_summary` | _none_ | `[{hostname, status, failedRules}]` |
+| `sda_fabrics` | `GET /sda_fabrics` | _none_ | `[{id, name}]` |
+| `sgt_catalog` | `GET /sgt_catalog` | _none_ | `[{id, name, value, desc}]` |
+| `sgt_matrix` | `GET /sgt_matrix` | _none_ | `[{src, dst, rule}]` |
+| `ise_live_radius` | `GET /ise_live_radius` | _none_ | recent RADIUS auths |
+| `ise_endpoints` | `GET /ise_endpoints` | _none_ | current ISE endpoints |
+| `config_drift` | `POST /config_drift` | `{{"hostname":"<host>","hours_back":<int>}}` | `{{"added":int,"removed":int,"sample":"..."}}` |
 
+### Example — inventory
 
-## ⚙️ Set Up Your Environment
+```http
+GET /mcp/inventory HTTP/1.1
+Host: 198.18.128.60:8000
+```
 
-### 1. Install `uv`
+```json
+[
+  {{
+    "hostname": "cat9000v-uadp-0",
+    "ip": "198.18.1.11",
+    "family": "Switches and Hubs",
+    "platform": "C9KV-UADP-8P",
+    "sw_version": "17.15.1",
+    "serial": "blank"
+  }}
+]
+```
 
-MacOS/Linux:
+### Example — config_drift
 
-    brew install uv
+```http
+POST /mcp/config_drift HTTP/1.1
+Content-Type: application/json
+Host: 198.18.128.60:8000
 
-> 🔁 Restart your terminal to ensure the `uv` command is available.
+{{"hostname":"cat8000v-0.lab.local","hours_back":24}}
+```
 
-### 2. Set Up Your Project
+```json
+{{
+  "added": 3,
+  "removed": 0,
+  "sample": "@@ -10,0 +11,3 @@\n+ntp server 198.18.133.20\n+ip ssh version 2\n+aaa authentication login default group radius\n"
+}}
+```
 
-    uv init
+---
 
-    uv venv
-    source .venv/bin/activate # or .venv\Scripts\activate on Windows
+## 3  Error conventions
 
-    uv add "mcp[cli]"
+| Condition | Tool response |
+|-----------|---------------|
+| Empty upstream data | `{{"message":"No <x> samples in the last 5 minutes."}}` |
+| Invalid input | `{{"message":"Device '<host>' not found."}}` |
+| Upstream API exception | `{{"message":"<exception text>"}}` |
 
+---
 
+## 4  Adding new tools
 
-## ▶️ Run Your Server
+1. Define an **async** function under the same `mcp` instance.
+2. Ensure every value in the returned dict/list is a primitive or string.
+3. Restart the MCP server; FastMCP auto‑registers it.
 
-    python network-assistant.py
+---
 
-This launches your MCP server over `stdio`, ready to connect to Claude.
+## 5  Security Notes
 
-
-
-## 🧪 Test with Claude for Desktop
-
-> Claude for Desktop is currently only available on macOS and Windows.
-1. Download Claude for Desktop from [here](https://www.anthropic.com/download).
-2. Open your Claude Desktop app.
-3. Configure the MCP server in:
-   - `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)
-   - `C:\Users\<YOU>\AppData\Roaming\Claude\claude_desktop_config.json` (Windows)
-
-Example config:
-
-    {
-      "mcpServers": {
-        "network": {
-          "command": "uv",
-          "args": [
-            "--directory",
-            "/ABSOLUTE/PATH/TO/network-assistant",
-            "run",
-            "network_assistant.py"
-          ]
-        }
-      }
-    }
-
-> Use `which uv` (macOS/Linux) or `where uv` (Windows) to get the path to `uv` if needed.
-
-Restart Claude Desktop after saving the config file.
-
-
-
-## 🔨 Tools Available in Claude
-
-Click the 🛠 hammer icon in Claude. You should see:
-
-- `get_network_standards()`
-- `get_device_status(device_name)`
-
-![Claude](assets/claude-af.gif)
-
-
-
-Now ask Claude:
-
-    - What routing protocols do we use in our network?
-    - What is the current status of my network devices?
-    - What is the status of all devices in the network?
-
-
-
-## 🔍 What’s Happening Behind the Scenes?
-
-1. Claude parses your prompt and finds relevant tools.
-2. It calls `get_network_standards()` or `get_device_status()` over MCP.
-3. Your server executes the tool logic and returns structured data.
-4. Claude responds using your actual context
-
+* MCP runs read-only REST calls—no config changes are made.
+* Store ISE credentials as read‑only users.
+* Use nginx/Caddy for HTTPS + port mapping in production.
